@@ -28,8 +28,8 @@
 ## 安装
 
 ```bash
-git clone <你的仓库 URL>.git
-cd <仓库目录>
+git clone https://github.com/Jackohhhh/ukb-cad-llm-finetuning.git
+cd ukb-cad-llm-finetuning
 
 # 可编辑安装（推荐开发）
 pip install -e .
