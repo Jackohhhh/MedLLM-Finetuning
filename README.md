@@ -13,7 +13,6 @@
 | **DeepSpeed ZeRO2** | 默认 `configs/deepspeed/zero2.json`，可与 HF `TrainingArguments` 对齐 |
 | **加权 CE** | `WeightedTrainer` + 数据集 YAML 中的 `class_weights` |
 | **评估** | `cli.eval`：加载 checkpoint，对测试集 `predict`，输出 `metrics.json` / `predictions.jsonl` |
-| **Flash Attention（可选）** | `pip install -e ".[flash]"`，训练脚本中加 `--attn-implementation flash_attention_2` |
 
 ---
 
@@ -38,7 +37,8 @@ pip install -e .
 pip install -e ".[flash]"
 ```
 
-依赖声明见 [`pyproject.toml`](pyproject.toml)。**不再维护根目录 `requirements.txt`**，请以 `pyproject.toml` 为准。
+依赖声明见 [`pyproject.toml`](pyproject.toml)。
+
 
 ---
 
@@ -84,8 +84,6 @@ bash scripts/train/finetune_full.sh
 bash scripts/eval/eval_binary_cls.sh
 ```
 
-请编辑脚本中的 **`--checkpoint`**（指向含 `adapter_config.json` 的 LoRA 目录，或全量权重的 HF 格式目录）。`eval` 与 `train` 共用同一套 **override** 参数（如 `--model-name-or-path`、`--test-file`、`--per-device-eval-batch-size` 等）。
-
 ### 仅调用 Python 模块
 
 ```bash
@@ -130,8 +128,6 @@ src/cad_finetune/
   train/             # runner, WeightedTrainer
   data/              # collator
 ```
-
-更细的目录说明可参考 [`PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md)（部分内容可能滞后于当前仓库，以实际文件为准）。
 
 ---
 
