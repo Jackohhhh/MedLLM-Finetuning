@@ -19,16 +19,15 @@ deepspeed --num_gpus=1 --module cad_finetune.cli.train \
   --test-file data/raw/medical_test.json \
   --output-dir outputs/checkpoints/qwen2_medical_full \
   --prediction-output-dir outputs/predictions/qwen2_medical_full \
-  --logging-dir outputs/logs/qwen2_medical_full \
   --launcher deepspeed \
   --bf16 \
   --tf32 true \
   --gradient-checkpointing true \
   --dataloader-num-workers 4 \
   --num-train-epochs 5 \
-  --per-device-train-batch-size 1 \
-  --per-device-eval-batch-size 4 \
-  --gradient-accumulation-steps 8 \
+  --per-device-train-batch-size 16 \
+  --per-device-eval-batch-size 8 \
+  --gradient-accumulation-steps 2 \
   --learning-rate 1e-5 \
   --weight-decay 0.01 \
   --warmup-ratio 0.1 \

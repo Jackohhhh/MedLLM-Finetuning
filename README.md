@@ -1,6 +1,6 @@
 # cad-finetune
 
-基于 **Hugging Face Transformers**、**PEFT（LoRA / QLoRA）** 与 **DeepSpeed** 的 **CAD / 医疗文本二分类** 微调脚手架：支持加权损失、数据集过采样、命令行覆盖超参，以及离线评估与预测落盘。
+基于 **Hugging Face Transformers**、**PEFT** 与 **DeepSpeed** 的 **CAD / 医疗文本二分类** 微调脚手架：支持 **QLoRA**（4bit + LoRA）、**LoRA**（bf16 全精度基座、无量化）、**全量微调**；以及加权损失、数据集过采样、命令行覆盖超参、离线评估与预测落盘。
 
 ---
 
@@ -8,9 +8,10 @@
 
 | 能力 | 说明 |
 |------|------|
-| **QLoRA / LoRA** | 4bit 量化 + LoRA，分类头与 `modules_to_save` 可配置 |
-| **全量微调** | 独立实验配置与脚本（无量化、无 LoRA） |
-| **DeepSpeed ZeRO2** | 默认 `configs/deepspeed/zero2.json`，可与 HF `TrainingArguments` 对齐 |
+| **QLoRA** | [`scripts/train/finetune_qlora.sh`](scripts/train/finetune_qlora.sh)：4bit 基座 + LoRA；优化器默认 `paged_adamw_32bit`（bitsandbytes），显存占用小 |
+| **LoRA（bf16）** | [`scripts/train/finetune_lora.sh`](scripts/train/finetune_lora.sh)：无量化、bf16 基座 + LoRA；优化器默认 `adamw_torch`，显存明显高于 QLoRA |
+| **全量微调** | [`scripts/train/finetune_full.sh`](scripts/train/finetune_full.sh)：无量化、无 LoRA |
+| **DeepSpeed ZeRO** | `configs/deepspeed/zero2.json`（ZeRO-2）与 `zero3.json`（ZeRO-3）；`--deepspeed` 可切换，精度与 HF 对齐 |
 | **加权 CE** | `WeightedTrainer` + 数据集 YAML 中的 `class_weights` |
 | **评估** | `cli.eval`：加载 checkpoint，对测试集 `predict`，输出 `metrics.json` / `predictions.jsonl` |
 
@@ -46,9 +47,9 @@ pip install -e ".[flash]"
 
 默认数据集配置见 [`configs/datasets/medical_binary.yaml`](configs/datasets/medical_binary.yaml)：
 
-- **训练**：`data/raw/medical_train.json`
-- **测试**：`data/raw/medical_test.json`
-- 未指定独立验证集时，从训练集按 **`validation_split`** 划分验证集
+- **训练集路径**：`data/raw/medical_train.json`
+- **测试集路径**：`data/raw/medical_test.json`
+- **验证集路径**：未指定独立验证集时，从训练集按 **`validation_split`** 划分验证集
 
 JSON 字段由 [`configs/tasks/binary_classification.yaml`](configs/tasks/binary_classification.yaml) 定义（默认文本列 **`input`**，标签列 **`output`**，值为 `0` / `1`）。
 
@@ -57,20 +58,24 @@ JSON 字段由 [`configs/tasks/binary_classification.yaml`](configs/tasks/binary
 ## 快速开始
 
 在项目根目录执行（脚本内已 `cd` 到仓库根并设置 `PYTHONPATH`）。
+**多卡**：在所用脚本中把 `deepspeed --num_gpus=1` 改成`deepspeed --num_gpus=N`。
 
-### QLoRA 训练
+### QLoRA（4bit 量化 + LoRA）
+
+脚本：[`scripts/train/finetune_qlora.sh`](scripts/train/finetune_qlora.sh)。默认 `--load-in-4bit true`、`--bf16`、`--optim paged_adamw_32bit`，检查点目录名示例：`qwen2_medical_lora`（与脚本内 `--experiment-name` / `--output-dir` 一致）。
+
+```bash
+bash scripts/train/finetune_qlora.sh
+```
+
+### LoRA（bf16 全精度基座，无量化）
+
+脚本：[`scripts/train/finetune_lora.sh`](scripts/train/finetune_lora.sh)。默认 `--load-in-4bit false`、`--bf16`、`--optim adamw_torch`；基座以 bf16 加载，**显存显著高于 QLoRA**，单卡请按需调小 batch 或增大 `gradient-accumulation-steps`。默认输出目录示例：`qwen2_medical_lora_bf16`。
 
 ```bash
 bash scripts/train/finetune_lora.sh
 ```
 
-多卡时请在 `finetune_lora.sh` 里把 `deepspeed --num_gpus=1` 改成所需卡数。附加 CLI 示例：
-
-```bash
-bash scripts/train/finetune_lora.sh --skip-test
-```
-
-超参写在 `finetune_lora.sh` 的 `deepspeed ... cad_finetune.cli.train \` 一段中；与 [`src/cad_finetune/cli/overrides.py`](src/cad_finetune/cli/overrides.py) 中的 CLI 参数对应，会覆盖 experiment YAML 合并结果。
 
 ### 全量微调
 
@@ -100,12 +105,20 @@ python -m cad_finetune.cli.eval --config configs/experiments/qwen2_medical_lora.
 | 路径 | 作用 |
 |------|------|
 | `configs/experiments/*.yaml` | 实验入口：`paths` 引用 model / task / dataset / deepspeed；顶层可写 `output_dir` 等 |
-| `configs/models/*.yaml` | 模型 ID、量化、LoRA 结构、`target_modules` 等（**LoRA 开启时必须配置 `target_modules`**） |
-| `configs/datasets/*.yaml` | 数据路径、划分、过采样、`class_weights` |
-| `configs/tasks/*.yaml` | 列名、`max_length`、类别数 |
-| `configs/deepspeed/*.json` | DeepSpeed 策略 |
+| `configs/models/*.yaml` | 模型 ID、默认量化与 LoRA 结构、`target_modules` 等（**LoRA 开启时必须配置 `target_modules`**）
+| `configs/datasets/*.yaml` | 数据路径、划分数据集、正样本过采样、`class_weights` 权重 |
+| `configs/tasks/*.yaml` | 列名、`max_length` 最大长度、类别数 |
+| `configs/deepspeed/*.json` | DeepSpeed加速：见下表 ZeRO-2 / ZeRO-3 |
 
-**训练超参（学习率、batch、scheduler、logging、LoRA 开关等）** 默认通过 **Shell + CLI** 传入，不再使用 `configs/training/`。
+
+#### DeepSpeed：`zero2.json` 与 `zero3.json`
+
+| 文件 | 含义 | 常见用途 |
+|------|------|----------|
+| `configs/deepspeed/zero2.json` | **ZeRO-2**：划分优化器状态与梯度 | 单卡 / 多卡都常用，实现与通信相对简单 |
+| `configs/deepspeed/zero3.json` | **ZeRO-3**：在 ZeRO-2 基础上再划分**参数** | 更省显存、通信更重；**多卡**大模型或想开大 batch 时优先考虑 |
+
+切换方式：训练脚本里把 `--deepspeed configs/deepspeed/zero2.json` 改成 `zero3.json`，或改实验 YAML 中 `paths.deepspeed`。
 
 ---
 
@@ -114,12 +127,12 @@ python -m cad_finetune.cli.eval --config configs/experiments/qwen2_medical_lora.
 ```text
 configs/
   datasets/          # 数据与采样、类别权重
-  deepspeed/         # ZeRO 等
+  deepspeed/         # zero2.json / zero3.json
   experiments/       # 实验组合（paths）
   models/            # 单模型配置
   tasks/             # 任务字段与长度
 scripts/
-  train/             # finetune_lora.sh, finetune_full.sh
+  train/             # finetune_qlora.sh, finetune_lora.sh, finetune_full.sh
   eval/              # eval_binary_cls.sh
 src/cad_finetune/
   cli/               # train / eval / overrides
@@ -131,13 +144,13 @@ src/cad_finetune/
 
 ---
 
-## 输出产物
+## 输出文件
 
 | 类型 | 位置（默认，可改脚本参数） |
 |------|----------------------------|
 | 检查点 / 适配器 | `--output-dir` |
 | 训练后测试集预测 | `--prediction-output-dir` 下的 `metrics.json`、`predictions.jsonl` |
-| 日志 | `--logging-dir`；若 `--report-to wandb` 需先 `wandb login` |
+| 训练曲线 / 指标 | `--report-to wandb` 时见 wandb 网页与项目下 `wandb/`；需先 `wandb key`。 |
 
 ---
 
@@ -146,8 +159,8 @@ src/cad_finetune/
 **模型从哪里下载？**  
 `model_name_or_path` 为 Hub ID（如 `Qwen/Qwen2-7B-Instruct`）时，首次运行会缓存到本机 Hugging Face 默认目录（或你设置的 `HF_HOME` / `cache_dir`）。
 
-**QLoRA 与 Flash Attention 同时报错？**  
-可先去掉 `--attn-implementation flash_attention_2`，或改用 `--attn-implementation sdpa`，再查 torch / flash-attn / CUDA 版本兼容性。
+**QLoRA / LoRA 训练与 Flash Attention 同时报错？**  
+可在对应训练脚本中去掉 `--attn-implementation flash_attention_2`，或改用 `--attn-implementation sdpa`，再查 torch / flash-attn / CUDA 版本兼容性。
 
 ---
 

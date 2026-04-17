@@ -130,11 +130,12 @@ def build_training_arguments(config: dict[str, Any], has_eval_dataset: bool) -> 
         "save_safetensors": training_cfg.get("save_safetensors", True),
         "gradient_checkpointing": runtime_cfg.get("gradient_checkpointing", False),
         "report_to": report_to,
-        "logging_dir": config.get("logging_dir", "outputs/logs"),
         "seed": runtime_cfg.get("seed", 42),
         "dataloader_num_workers": runtime_cfg.get("dataloader_num_workers", 0),
         "deepspeed": deepspeed_arg,
         "label_names": ["labels"],
     }
+    if config.get("logging_dir"):
+        ta["logging_dir"] = config["logging_dir"]
     ta.update(_eval_strategy_training_args_kwarg(evaluation_strategy))
     return _instantiate_training_arguments(**ta)
