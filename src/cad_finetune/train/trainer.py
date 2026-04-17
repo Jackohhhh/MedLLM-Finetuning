@@ -25,6 +25,25 @@ class WeightedTrainer(Trainer):
         return (loss, outputs) if return_outputs else loss
 
 
+def _deepspeed_config_for_trainer(config: dict[str, Any]) -> str | dict[str, Any] | None:
+    """让 DeepSpeed JSON 里的 fp16/bf16 与 TrainingArguments（如 shell 里 --fp16/--bf16）一致。
+
+    配置加载时会把 deepspeed 文件读进 config['deepspeed']；这里就地同步后再把 dict 传给 Trainer，
+    这样不必每次改磁盘上的 zero2.json。
+    """
+    training_cfg = config["training"]
+    fp16 = bool(training_cfg.get("fp16", False))
+    bf16 = bool(training_cfg.get("bf16", False))
+    ds = config.get("deepspeed")
+    if isinstance(ds, dict):
+        if "fp16" in ds and isinstance(ds["fp16"], dict):
+            ds["fp16"]["enabled"] = fp16
+        if "bf16" in ds and isinstance(ds["bf16"], dict):
+            ds["bf16"]["enabled"] = bf16
+        return ds
+    return config.get("deepspeed_config_path")
+
+
 def build_training_arguments(config: dict[str, Any], has_eval_dataset: bool) -> TrainingArguments:
     training_cfg = config["training"]
     runtime_cfg = config.get("runtime", {})
@@ -38,9 +57,9 @@ def build_training_arguments(config: dict[str, Any], has_eval_dataset: bool) -> 
         load_best_model_at_end = False
 
     report_to = runtime_cfg.get("report_to", [])
-    deepspeed_config_path = config.get("deepspeed_config_path")
-    if runtime_cfg.get("launcher") != "deepspeed":
-        deepspeed_config_path = None
+    deepspeed_arg: str | dict[str, Any] | None = None
+    if runtime_cfg.get("launcher") == "deepspeed":
+        deepspeed_arg = _deepspeed_config_for_trainer(config)
 
     return TrainingArguments(
         output_dir=config.get("output_dir", "outputs/checkpoints/default"),
@@ -66,6 +85,7 @@ def build_training_arguments(config: dict[str, Any], has_eval_dataset: bool) -> 
         max_steps=training_cfg.get("max_steps", -1),
         fp16=training_cfg.get("fp16", False),
         bf16=training_cfg.get("bf16", False),
+        tf32=training_cfg.get("tf32", True),
         remove_unused_columns=training_cfg.get("remove_unused_columns", False),
         max_grad_norm=training_cfg.get("max_grad_norm", 1.0),
         warmup_ratio=training_cfg.get("warmup_ratio", 0.0),
@@ -75,6 +95,6 @@ def build_training_arguments(config: dict[str, Any], has_eval_dataset: bool) -> 
         logging_dir=config.get("logging_dir", "outputs/logs"),
         seed=runtime_cfg.get("seed", 42),
         dataloader_num_workers=runtime_cfg.get("dataloader_num_workers", 0),
-        deepspeed=deepspeed_config_path,
+        deepspeed=deepspeed_arg,
         label_names=["labels"],
     )

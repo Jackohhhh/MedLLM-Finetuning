@@ -113,6 +113,8 @@ def apply_experiment_cli_overrides(config: dict[str, Any], args: argparse.Namesp
     if args.bf16:
         t["bf16"] = True
         t["fp16"] = False
+    if args.tf32 is not None:
+        t["tf32"] = args.tf32 == "true"
 
     m = config.setdefault("model", {})
     lora = m.setdefault("lora", {})
@@ -198,6 +200,12 @@ def register_experiment_override_args(parser: argparse.ArgumentParser) -> None:
     t.add_argument("--optim", default=None)
     t.add_argument("--fp16", action="store_true", help="Force fp16 on (and bf16 off).")
     t.add_argument("--bf16", action="store_true", help="Force bf16 on (and fp16 off).")
+    t.add_argument(
+        "--tf32",
+        choices=["true", "false"],
+        default=None,
+        help="TF32 for matmul on Ampere+ (default in TrainingArguments: on unless overridden).",
+    )
 
     l = parser.add_argument_group("LoRA / quantization")
     l.add_argument("--lora-enable", choices=["true", "false"], default=None)
