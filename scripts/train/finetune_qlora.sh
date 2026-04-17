@@ -35,10 +35,10 @@ deepspeed --num_gpus=1 --module cad_finetune.cli.train \
   --gradient-checkpointing true \
   --dataloader-num-workers 4 \
   --num-train-epochs 5 \
-  --per-device-train-batch-size 32 \
+  --per-device-train-batch-size 64 \
   --per-device-eval-batch-size 16 \
-  --gradient-accumulation-steps 1 \
-  --learning-rate 3e-5 \
+  --gradient-accumulation-steps 2 \
+  --learning-rate 1e-4 \
   --weight-decay 0.0 \
   --warmup-ratio 0.1 \
   --lr-scheduler-type cosine \
