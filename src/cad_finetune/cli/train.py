@@ -14,6 +14,12 @@ def parse_args() -> argparse.Namespace:
         "optional flags override (typically from shell scripts).",
     )
     parser.add_argument("--config", required=True, help="Path to the experiment YAML file.")
+    parser.add_argument(
+        "--local_rank",
+        type=int,
+        default=-1,
+        help="Injected by DeepSpeed/torchrun; unused in CLI but required so launch does not fail.",
+    )
     register_experiment_override_args(parser)
     parser.add_argument(
         "--skip-test",
