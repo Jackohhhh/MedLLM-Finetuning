@@ -1,0 +1,8 @@
+experiment_name: placeholder
+output_dir: outputs/checkpoints/placeholder
+prediction_output_dir: outputs/predictions/placeholder
+paths:
+  model: ../models/seq_cls.yaml
+  task: ../tasks/binary_classification.yaml
+  dataset: ../datasets/medical_binary.yaml
+  deepspeed: ../deepspeed/zero2.json

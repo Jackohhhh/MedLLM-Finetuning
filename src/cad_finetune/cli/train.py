@@ -6,12 +6,15 @@ from pathlib import Path
 from cad_finetune.cli.overrides import apply_experiment_cli_overrides, register_experiment_override_args
 from cad_finetune.train.runner import run_train
 from cad_finetune.utils.config import load_experiment_config
+from cad_finetune.utils.train_paths import apply_train_run_paths
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Train a finetuning experiment. Base settings come from --config YAML; "
-        "optional flags override (typically from shell scripts).",
+        "optional flags override (typically from shell scripts). "
+        "experiment_name / output_dir / prediction_output_dir are derived from model_name_or_path "
+        "and LoRA/quantization (full / lora / qlora); not overridable via CLI here.",
     )
     parser.add_argument("--config", required=True, help="Path to the experiment YAML file.")
     parser.add_argument(
@@ -20,7 +23,7 @@ def parse_args() -> argparse.Namespace:
         default=-1,
         help="Injected by DeepSpeed/torchrun; unused in CLI but required so launch does not fail.",
     )
-    register_experiment_override_args(parser)
+    register_experiment_override_args(parser, include_run_paths=False)
     parser.add_argument(
         "--skip-test",
         action="store_true",
@@ -33,6 +36,7 @@ def main() -> None:
     args = parse_args()
     config = load_experiment_config(Path(args.config))
     apply_experiment_cli_overrides(config, args)
+    apply_train_run_paths(config)
     if args.skip_test:
         config.setdefault("training", {})["run_test_after_train"] = False
     run_train(config)

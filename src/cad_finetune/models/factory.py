@@ -41,7 +41,7 @@ def _build_quantization_config(model_cfg: dict[str, Any]) -> BitsAndBytesConfig 
     return None
 
 
-def _resolve_target_modules(model_cfg: dict[str, Any]) -> list[str]:
+def _resolve_target_modules(model_cfg: dict[str, Any]) -> list[str] | str:
     configured = model_cfg.get("lora", {}).get("target_modules")
     if configured:
         return configured
@@ -179,7 +179,10 @@ def load_checkpoint_for_eval(config: dict[str, Any], checkpoint_path: str):
     tokenizer.padding_side = model_cfg.get("padding_side", "right")
 
     try:
-        model = AutoPeftModelForSequenceClassification.from_pretrained(checkpoint_path)
+        model = AutoPeftModelForSequenceClassification.from_pretrained(
+            checkpoint_path,
+            trust_remote_code=model_cfg.get("trust_remote_code", False),
+        )
     except Exception:
         model = AutoModelForSequenceClassification.from_pretrained(
             checkpoint_path,

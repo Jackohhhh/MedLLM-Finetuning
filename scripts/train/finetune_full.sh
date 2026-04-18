@@ -1,24 +1,23 @@
 #!/usr/bin/env bash
 #
-# 全量微调（无 LoRA、无量化）。显存需求远高于 QLoRA；多卡 + DeepSpeed ZeRO 仍可能吃紧，请按卡显存调 batch / accum。
-# 精度用 --fp16 / --bf16 即可，无需改 configs/deepspeed/*.json（Trainer 会同步 DeepSpeed 的 fp16/bf16 开关）。
-# Flash Attention：pip install -e ".[flash]" 后在 deepspeed 命令中加 --attn-implementation flash_attention_2
-#
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${PROJECT_ROOT}"
 export PYTHONPATH="${PROJECT_ROOT}/src:${PYTHONPATH:-}"
 
+################## 按需改行内参数 ##################
+# 多卡：把下一行改成 --num_gpus=2（或 4、8）
+# 精度：--fp16 / --bf16 二选一
+# 换模型：改 --model-name-or-path（必要时再加 --tokenizer-name-or-path）
+################## 按需改行内参数 ##################
+
 deepspeed --num_gpus=1 --module cad_finetune.cli.train \
   --deepspeed configs/deepspeed/zero2.json \
-  --config configs/experiments/qwen2_medical_full.yaml \
-  --experiment-name qwen2_medical_full \
+  --config configs/experiments/medical.yaml \
   --model-name-or-path Qwen/Qwen2-7B-Instruct \
   --train-file data/raw/medical_train.json \
   --test-file data/raw/medical_test.json \
-  --output-dir outputs/checkpoints/qwen2_medical_full \
-  --prediction-output-dir outputs/predictions/qwen2_medical_full \
   --launcher deepspeed \
   --bf16 \
   --tf32 true \

@@ -32,11 +32,11 @@ def apply_experiment_cli_overrides(config: dict[str, Any], args: argparse.Namesp
     if args.test_file:
         config.setdefault("dataset", {})["test_file"] = args.test_file
 
-    if args.experiment_name:
+    if getattr(args, "experiment_name", None):
         config["experiment_name"] = args.experiment_name
-    if args.output_dir:
+    if getattr(args, "output_dir", None):
         config["output_dir"] = args.output_dir
-    if args.prediction_output_dir:
+    if getattr(args, "prediction_output_dir", None):
         config["prediction_output_dir"] = args.prediction_output_dir
     if args.logging_dir:
         config["logging_dir"] = args.logging_dir
@@ -145,7 +145,11 @@ def apply_experiment_cli_overrides(config: dict[str, Any], args: argparse.Namesp
             m["attn_implementation"] = args.attn_implementation.strip()
 
 
-def register_experiment_override_args(parser: argparse.ArgumentParser) -> None:
+def register_experiment_override_args(
+    parser: argparse.ArgumentParser,
+    *,
+    include_run_paths: bool = True,
+) -> None:
     m = parser.add_argument_group("model / data overrides")
     m.add_argument("--model-name-or-path", default=None, help="HF id or local path for weights.")
     m.add_argument("--tokenizer-name-or-path", default=None, help="Tokenizer id or path (defaults follow model YAML).")
@@ -158,9 +162,10 @@ def register_experiment_override_args(parser: argparse.ArgumentParser) -> None:
     m.add_argument("--test-file", default=None)
 
     o = parser.add_argument_group("run paths")
-    o.add_argument("--experiment-name", default=None)
-    o.add_argument("--output-dir", default=None)
-    o.add_argument("--prediction-output-dir", default=None)
+    if include_run_paths:
+        o.add_argument("--experiment-name", default=None)
+        o.add_argument("--output-dir", default=None)
+        o.add_argument("--prediction-output-dir", default=None)
     o.add_argument("--logging-dir", default=None)
 
     r = parser.add_argument_group("runtime / launcher")
